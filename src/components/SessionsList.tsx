@@ -9,15 +9,11 @@ import { SessionDetail } from "@/components/SessionDetail";
 
 interface SessionsListProps {
   sessions: Session[];
-  setSessions: (sessions: Session[]) => void;
+  onDeleteSession: (sessionId: string) => void;
 }
 
-export const SessionsList = ({ sessions, setSessions }: SessionsListProps) => {
+export const SessionsList = ({ sessions, onDeleteSession }: SessionsListProps) => {
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
-
-  const deleteSession = (sessionId: string) => {
-    setSessions(sessions.filter(session => session.id !== sessionId));
-  };
 
   const getSessionAverage = (session: Session) => {
     const ratedSkills = session.skills.filter(skill => skill.rating > 0);
@@ -71,7 +67,7 @@ export const SessionsList = ({ sessions, setSessions }: SessionsListProps) => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => deleteSession(session.id)}
+                      onClick={() => onDeleteSession(session.id)}
                       className="text-red-600 hover:text-red-700"
                     >
                       <Trash2 className="h-4 w-4" />

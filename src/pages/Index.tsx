@@ -1,20 +1,44 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Plus, TrendingUp, AlertTriangle, Star } from "lucide-react";
+import { Plus, TrendingUp, AlertTriangle, Star, LogOut } from "lucide-react";
 import { DashboardStats } from "@/components/DashboardStats";
 import { SessionForm } from "@/components/SessionForm";
 import { ProgressChart } from "@/components/ProgressChart";
 import { SessionsList } from "@/components/SessionsList";
-import { useLocalStorage } from "@/hooks/useLocalStorage";
-import { Session, DVSA_SKILLS } from "@/lib/drivingSkills";
+import { Auth } from "@/components/Auth";
+import { useAuth } from "@/hooks/useAuth";
+import { useSessions } from "@/hooks/useSessions";
+import { DVSA_SKILLS } from "@/lib/drivingSkills";
+import { Toaster } from "@/components/ui/toaster";
 
 const Index = () => {
-  const [sessions, setSessions] = useLocalStorage<Session[]>("driving-sessions", []);
+  const { user, loading: authLoading, signOut } = useAuth();
+  const { sessions, loading: sessionsLoading, saveSession, deleteSession } = useSessions();
   const [showSessionForm, setShowSessionForm] = useState(false);
   const [activeTab, setActiveTab] = useState<"dashboard" | "progress" | "sessions">("dashboard");
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <>
+        <Auth />
+        <Toaster />
+      </>
+    );
+  }
 
   const problemAreas = ["Junctions - observing", "Roundabouts", "Reverse park - control"];
   
@@ -43,11 +67,20 @@ const Index = () => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
       <div className="container mx-auto p-6">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            Driving Progress Tracker
-          </h1>
-          <p className="text-gray-600">Track your journey to becoming a confident driver</p>
+        <div className="mb-8 flex justify-between items-center">
+          <div>
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">
+              Driving Progress Tracker
+            </h1>
+            <p className="text-gray-600">Track your journey to becoming a confident driver</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-gray-600">Welcome, {user.email}</span>
+            <Button variant="outline" onClick={signOut} size="sm">
+              <LogOut className="h-4 w-4 mr-2" />
+              Sign Out
+            </Button>
+          </div>
         </div>
 
         {/* Navigation */}
@@ -90,90 +123,99 @@ const Index = () => {
           </Button>
         </div>
 
-        {/* Content based on active tab */}
-        {activeTab === "dashboard" && (
-          <div className="space-y-6">
-            {/* Overall Progress Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-green-600" />
-                  Overall Progress
-                </CardTitle>
-                <CardDescription>
-                  Your average performance across all DVSA skills
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Progress</span>
-                    <span>{Math.round((overallProgress() / 5) * 100)}%</span>
-                  </div>
-                  <Progress value={(overallProgress() / 5) * 100} className="h-3" />
-                  <p className="text-sm text-gray-600 mt-2">
-                    Average rating: {overallProgress().toFixed(1)}/5 stars
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Problem Areas Card */}
-            <Card className="border-orange-200 bg-orange-50">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-orange-800">
-                  <AlertTriangle className="h-5 w-5" />
-                  Focus Areas (Previous Test Issues)
-                </CardTitle>
-                <CardDescription className="text-orange-700">
-                  Skills that need extra attention based on your last test
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {problemAreas.map((skill) => {
-                    const average = getSkillAverage(skill);
-                    return (
-                      <div key={skill} className="flex items-center justify-between p-3 bg-white rounded-lg border border-orange-200">
-                        <span className="font-medium text-gray-900">{skill}</span>
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <Star
-                                key={star}
-                                className={`h-4 w-4 ${
-                                  star <= average
-                                    ? "text-yellow-400 fill-current"
-                                    : "text-gray-300"
-                                }`}
-                              />
-                            ))}
-                          </div>
-                          <span className="text-sm text-gray-600">
-                            {average > 0 ? average.toFixed(1) : "Not rated"}
-                          </span>
-                        </div>
+        {sessionsLoading ? (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-gray-900 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading sessions...</p>
+          </div>
+        ) : (
+          <>
+            {/* Content based on active tab */}
+            {activeTab === "dashboard" && (
+              <div className="space-y-6">
+                {/* Overall Progress Card */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5 text-green-600" />
+                      Overall Progress
+                    </CardTitle>
+                    <CardDescription>
+                      Your average performance across all DVSA skills
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>Progress</span>
+                        <span>{Math.round((overallProgress() / 5) * 100)}%</span>
                       </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
+                      <Progress value={(overallProgress() / 5) * 100} className="h-3" />
+                      <p className="text-sm text-gray-600 mt-2">
+                        Average rating: {overallProgress().toFixed(1)}/5 stars
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
 
-            <DashboardStats sessions={sessions} />
-          </div>
-        )}
+                {/* Problem Areas Card */}
+                <Card className="border-orange-200 bg-orange-50">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-orange-800">
+                      <AlertTriangle className="h-5 w-5" />
+                      Focus Areas (Previous Test Issues)
+                    </CardTitle>
+                    <CardDescription className="text-orange-700">
+                      Skills that need extra attention based on your last test
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {problemAreas.map((skill) => {
+                        const average = getSkillAverage(skill);
+                        return (
+                          <div key={skill} className="flex items-center justify-between p-3 bg-white rounded-lg border border-orange-200">
+                            <span className="font-medium text-gray-900">{skill}</span>
+                            <div className="flex items-center gap-2">
+                              <div className="flex items-center">
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <Star
+                                    key={star}
+                                    className={`h-4 w-4 ${
+                                      star <= average
+                                        ? "text-yellow-400 fill-current"
+                                        : "text-gray-300"
+                                    }`}
+                                  />
+                                ))}
+                              </div>
+                              <span className="text-sm text-gray-600">
+                                {average > 0 ? average.toFixed(1) : "Not rated"}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
 
-        {activeTab === "progress" && (
-          <div className="space-y-6">
-            <ProgressChart sessions={sessions} />
-          </div>
-        )}
+                <DashboardStats sessions={sessions} />
+              </div>
+            )}
 
-        {activeTab === "sessions" && (
-          <div className="space-y-6">
-            <SessionsList sessions={sessions} setSessions={setSessions} />
-          </div>
+            {activeTab === "progress" && (
+              <div className="space-y-6">
+                <ProgressChart sessions={sessions} />
+              </div>
+            )}
+
+            {activeTab === "sessions" && (
+              <div className="space-y-6">
+                <SessionsList sessions={sessions} onDeleteSession={deleteSession} />
+              </div>
+            )}
+          </>
         )}
 
         {/* Session Form Modal */}
@@ -181,12 +223,13 @@ const Index = () => {
           <SessionForm
             onClose={() => setShowSessionForm(false)}
             onSave={(session) => {
-              setSessions(prev => [session, ...prev]);
+              saveSession(session);
               setShowSessionForm(false);
             }}
           />
         )}
       </div>
+      <Toaster />
     </div>
   );
 };
